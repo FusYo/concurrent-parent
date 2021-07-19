@@ -7,5 +7,6 @@
   <modules>
   	<module>20210614-service</module>
   	<module>source-code</module>
+  	<module>juc-source-code</module>
   </modules>
 </project>
