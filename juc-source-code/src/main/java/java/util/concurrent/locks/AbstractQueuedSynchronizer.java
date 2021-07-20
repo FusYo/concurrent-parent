@@ -286,6 +286,17 @@ import sun.misc.Unsafe;
  * @since 1.5
  * @author Doug Lea
  */
+
+/**
+ * 队列同步器
+ * AQS是cas的实现，是一种在用户态下操作的锁，没有到内核态的切换，所以效率比较高
+ * 总结分成 3 类：
+   -独占式获取与释放同步状态
+   -共享式获取与释放同步状态
+   -查询同步队列中的等待线程情况
+ * @author fussen
+ * @time 2021年7月19日 
+ */
 public abstract class AbstractQueuedSynchronizer
     extends AbstractOwnableSynchronizer
     implements java.io.Serializable {
@@ -530,6 +541,7 @@ public abstract class AbstractQueuedSynchronizer
     /**
      * The synchronization state.
      */
+    //【重点】同步状态
     private volatile int state;
 
     /**
@@ -537,6 +549,8 @@ public abstract class AbstractQueuedSynchronizer
      * This operation has memory semantics of a {@code volatile} read.
      * @return current state value
      */
+    //【重点】返回同步状态的当前值
+    //该操作具有volatile读取的内存语义
     protected final int getState() {
         return state;
     }
@@ -546,6 +560,8 @@ public abstract class AbstractQueuedSynchronizer
      * This operation has memory semantics of a {@code volatile} write.
      * @param newState the new state value
      */
+    //【重点】设置同步状态的值
+    //该操作具有volatile写的内存语义
     protected final void setState(int newState) {
         state = newState;
     }
@@ -561,6 +577,8 @@ public abstract class AbstractQueuedSynchronizer
      * @return {@code true} if successful. False return indicates that the actual
      *         value was not equal to the expected value.
      */
+    //【重点】自动地将同步状态设置为给定的更新值
+    //使用 CAS 设置当前状态，该方法能够保证状态设置的原子性
     protected final boolean compareAndSetState(int expect, int update) {
         // See below for intrinsics setup to support this
         return unsafe.compareAndSwapInt(this, stateOffset, expect, update);
@@ -1072,6 +1090,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
      */
+    //独占式获取同步状态，获取同步状态成功后，其他线程需要等待该线程释放同步状态才能获取同步状态。
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1098,6 +1117,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
      */
+    //独占式释放同步状态
     protected boolean tryRelease(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1134,6 +1154,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if shared mode is not supported
      */
+    //共享式获取同步状态，返回值大于等于 0 ，则表示获取成功；否则，获取失败。
     protected int tryAcquireShared(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1159,6 +1180,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if shared mode is not supported
      */
+    //共享式释放同步状态
     protected boolean tryReleaseShared(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1178,6 +1200,7 @@ public abstract class AbstractQueuedSynchronizer
      *         {@code false} otherwise
      * @throws UnsupportedOperationException if conditions are not supported
      */
+    //当前同步器是否在独占式模式下被线程占用，一般该方法表示是否被当前线程所独占。
     protected boolean isHeldExclusively() {
         throw new UnsupportedOperationException();
     }
@@ -1194,6 +1217,8 @@ public abstract class AbstractQueuedSynchronizer
      *        {@link #tryAcquire} but is otherwise uninterpreted and
      *        can represent anything you like.
      */
+    //独占式获取同步状态。如果当前线程获取同步状态成功，则由该方法返回；
+    //       否则，将会进入同步队列等待。
     public final void acquire(int arg) {
         if (!tryAcquire(arg) &&
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
@@ -1214,6 +1239,8 @@ public abstract class AbstractQueuedSynchronizer
      *        can represent anything you like.
      * @throws InterruptedException if the current thread is interrupted
      */
+    //与 #acquire(int arg) 方法相同，但是该方法响应中断。
+    //当前线程为获取到同步状态而进入到同步队列中，如果当前线程被中断，则该方法会抛出InterruptedException 异常并返回
     public final void acquireInterruptibly(int arg)
             throws InterruptedException {
         if (Thread.interrupted())
@@ -1239,6 +1266,7 @@ public abstract class AbstractQueuedSynchronizer
      * @return {@code true} if acquired; {@code false} if timed out
      * @throws InterruptedException if the current thread is interrupted
      */
+    //超时获取同步状态。如果当前线程在 nanos 时间内没有获取到同步状态，那么将会返回 false ，已经获取则返回 true 
     public final boolean tryAcquireNanos(int arg, long nanosTimeout)
             throws InterruptedException {
         if (Thread.interrupted())
@@ -1257,6 +1285,7 @@ public abstract class AbstractQueuedSynchronizer
      *        can represent anything you like.
      * @return the value returned from {@link #tryRelease}
      */
+    //独占式释放同步状态，该方法会在释放同步状态之后，将同步队列中第一个节点包含的线程唤醒。
     public final boolean release(int arg) {
         if (tryRelease(arg)) {
             Node h = head;
@@ -1278,6 +1307,8 @@ public abstract class AbstractQueuedSynchronizer
      *        {@link #tryAcquireShared} but is otherwise uninterpreted
      *        and can represent anything you like.
      */
+    //共享式获取同步状态，如果当前线程未获取到同步状态，将会进入同步队列等待，
+    // 与独占式的主要区别是在同一时刻可以有多个线程获取到同步状态
     public final void acquireShared(int arg) {
         if (tryAcquireShared(arg) < 0)
             doAcquireShared(arg);
@@ -1296,6 +1327,8 @@ public abstract class AbstractQueuedSynchronizer
      * you like.
      * @throws InterruptedException if the current thread is interrupted
      */
+    //共享式获取同步状态，响应中断
+    //线程为获取到同步状态而进入到同步队列中，如果当前线程被中断，则该方法会抛出InterruptedException 异常并返回
     public final void acquireSharedInterruptibly(int arg)
             throws InterruptedException {
         if (Thread.interrupted())
@@ -1320,6 +1353,7 @@ public abstract class AbstractQueuedSynchronizer
      * @return {@code true} if acquired; {@code false} if timed out
      * @throws InterruptedException if the current thread is interrupted
      */
+    //共享式获取同步状态，增加超时限制
     public final boolean tryAcquireSharedNanos(int arg, long nanosTimeout)
             throws InterruptedException {
         if (Thread.interrupted())
@@ -1337,6 +1371,7 @@ public abstract class AbstractQueuedSynchronizer
      *        and can represent anything you like.
      * @return the value returned from {@link #tryReleaseShared}
      */
+    //共享式释放同步状态
     public final boolean releaseShared(int arg) {
         if (tryReleaseShared(arg)) {
             doReleaseShared();
